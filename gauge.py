@@ -31,9 +31,9 @@ class NetworkMonitor:
             'ifOutOctets': '1.3.6.1.2.1.31.1.1.1.10.3'  # ifHCOutOctets for eth0 (index 3)
         }
 
-        # Maximum values for scaling (in bytes per second)
-        self.up_max = 40_000_000    # 40 MB/s uplink in bytes/sec
-        self.down_max = 125_000_000  # 1 Gbps downlink in bytes/sec
+        # Maximum values for scaling (in bits per second)
+        self.up_max = 40_000_000    # 40 Mbps uplink in bits/sec
+        self.down_max = 125_000_000  # 1 Gbps downlink in bits/sec
 
         # Initialize meters
         self.up_meter = NetworkMeter(18, self.up_max, self.oids['ifOutOctets'])  # GPIO18 for upload
@@ -75,7 +75,7 @@ class NetworkMonitor:
                 return value
 
     def scale_to_pwm(self, value_bps, max_bps):
-        """Scale bytes per second to PWM value (0-100) using logarithmic scaling for high values"""
+        """Scale bits per second to PWM value (0-100) using logarithmic scaling for high values"""
         if value_bps < 0:
             print(f"Warning: Value {value_bps} is negative")
             return 0
@@ -140,7 +140,7 @@ class NetworkMonitor:
                 if self.verbose:
                     print(f"Smoothed rates - Up: {self.smoothed_up_rate}, Down: {self.smoothed_down_rate}")
 
-                # Convert to MB/sec for display
+                # Convert to Mb/sec for display
                 up_rate_mb = self.smoothed_up_rate / 1000000
                 down_rate_mb = self.smoothed_down_rate / 1000000
 
