@@ -1,6 +1,7 @@
 import RPi.GPIO as GPIO
 import time
 from pysnmp.hlapi import *
+import math
 
 class NetworkMeter:
     def __init__(self, pin, max_value, oid):
@@ -69,11 +70,20 @@ class NetworkMonitor:
                 return value
 
     def scale_to_pwm(self, value_bps, max_bps):
-        """Scale bytes per second to PWM value (0-100)"""
-        if value_bps < 0 or value_bps > (max_bps * 1.2):
-            print(f"Warning: Value {value_bps} out of expected range for max {max_bps}")
+        """Scale bytes per second to PWM value (0-100) using logarithmic scaling for high values"""
+        if value_bps < 0:
+            print(f"Warning: Value {value_bps} is negative")
             return 0
-        return int(min(value_bps / max_bps, 1.0) * 100)
+
+        # For very large values, use a logarithmic scale
+        if value_bps > max_bps * 2:
+            log_value = math.log(value_bps / (max_bps * 2), 10)
+            pwm_value = min(100 - int((math.exp(log_value) - 1) * 50), 100)
+        else:
+            # For normal values, use linear scaling
+            pwm_value = int(min(value_bps / max_bps, 1.0) * 100)
+
+        return pwm_value
 
     def run(self):
         """Main loop to update meters"""
