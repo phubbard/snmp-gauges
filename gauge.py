@@ -66,6 +66,13 @@ class NetworkMonitor:
             for varBind in varBinds:
                 return int(varBind[1])
 
+    def scale_to_pwm(self, value_bps, max_bps):
+        """Scale bytes per second to PWM value (0-100)"""
+        if value_bps < 0 or value_bps > (max_bps * 1.2):
+            print(f"Warning: Value {value_bps} out of expected range for max {max_bps}")
+            return 0
+        return int(min(value_bps / max_bps, 1.0) * 100)
+
     def run(self):
         """Main loop to update meters"""
         while True:
@@ -113,8 +120,8 @@ class NetworkMonitor:
                 print(f"Rates in MB/s - Up: {up_rate_mb}, Down: {down_rate_mb}")
 
                 # Calculate PWM values (0-100)
-                up_pwm = min(100, max(0, (self.smoothed_up_rate / self.up_max) * 100))
-                down_pwm = min(100, max(0, (self.smoothed_down_rate / self.down_max) * 100))
+                up_pwm = self.scale_to_pwm(self.smoothed_up_rate, self.up_max)
+                down_pwm = self.scale_to_pwm(self.smoothed_down_rate, self.down_max)
 
                 print(f"PWM values - Up: {up_pwm}, Down: {down_pwm}")
 
