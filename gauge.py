@@ -98,6 +98,7 @@ class NetworkMonitor:
 
     def run(self):
         """Main loop to update meters"""
+        last_print_time = time.time()
         while True:
             try:
                 # Get current values from SNMP
@@ -159,11 +160,13 @@ class NetworkMonitor:
 
                 # Print summary every minute in non-verbose mode
                 if not self.verbose:
-                    print(f"Rates in MB/s - Up: {up_rate_mb:.2f}, Down: {down_rate_mb:.2f}")
-                    time.sleep(60)  # Wait for 1 minute
-                else:
-                    # Sleep for 1 second in verbose mode
-                    time.sleep(1)
+                    current_time = time.time()
+                    if current_time - last_print_time >= 60:
+                        print(f"Rates in MB/s - Up: {up_rate_mb:.2f}, Down: {down_rate_mb:.2f}")
+                        last_print_time = current_time
+
+                # Sleep for 1 second
+                time.sleep(1)
 
             except Exception as e:
                 print(f"Error in main loop: {e}")
