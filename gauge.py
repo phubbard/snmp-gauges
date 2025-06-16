@@ -94,12 +94,12 @@ class NetworkMonitor:
 
                 # Calculate rate (delta) in bytes per second, handling counter wrapping
                 if up_value < self.prev_up_value:
-                    up_rate = (up_value + (2**32) - self.prev_up_value) % (2**32)  # Handle 32-bit counter wrap
+                    up_rate = (up_value + (2**64) - self.prev_up_value) % (2**64)  # Handle 64-bit counter wrap
                 else:
                     up_rate = up_value - self.prev_up_value
 
                 if down_value < self.prev_down_value:
-                    down_rate = (down_value + (2**32) - self.prev_down_value) % (2**32)  # Handle 32-bit counter wrap
+                    down_rate = (down_value + (2**64) - self.prev_down_value) % (2**64)  # Handle 64-bit counter wrap
                 else:
                     down_rate = down_value - self.prev_down_value
 
