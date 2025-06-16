@@ -74,6 +74,8 @@ class NetworkMonitor:
                 up_value = self.get_snmp_value(self.oids['ifOutOctets'])  # Value is in bytes
                 down_value = self.get_snmp_value(self.oids['ifInOctets'])  # Value is in bytes
 
+                print(f"Raw SNMP values - Up: {up_value}, Down: {down_value}")
+
                 # Skip the first reading
                 if self.prev_up_value is None or self.prev_down_value is None:
                     self.prev_up_value = up_value
@@ -92,6 +94,8 @@ class NetworkMonitor:
                 else:
                     down_rate = down_value - self.prev_down_value
 
+                print(f"Calculated rates - Up: {up_rate}, Down: {down_rate}")
+
                 # Update previous values
                 self.prev_up_value = up_value
                 self.prev_down_value = down_value
@@ -100,16 +104,19 @@ class NetworkMonitor:
                 self.smoothed_up_rate = (1 - self.alpha) * self.smoothed_up_rate + self.alpha * up_rate
                 self.smoothed_down_rate = (1 - self.alpha) * self.smoothed_down_rate + self.alpha * down_rate
 
+                print(f"Smoothed rates - Up: {self.smoothed_up_rate}, Down: {self.smoothed_down_rate}")
+
                 # Convert to MB/sec for display
                 up_rate_mb = self.smoothed_up_rate / 1000000
                 down_rate_mb = self.smoothed_down_rate / 1000000
+
+                print(f"Rates in MB/s - Up: {up_rate_mb}, Down: {down_rate_mb}")
 
                 # Calculate PWM values (0-100)
                 up_pwm = min(100, max(0, (self.smoothed_up_rate / self.up_max) * 100))
                 down_pwm = min(100, max(0, (self.smoothed_down_rate / self.down_max) * 100))
 
-                # Print values for debugging
-                print(f"Up: {up_rate_mb:.2f} MB/sec, Down: {down_rate_mb:.2f} MB/sec | Up PWM: {up_pwm:.2f}, Down PWM: {down_pwm:.2f}")
+                print(f"PWM values - Up: {up_pwm}, Down: {down_pwm}")
 
                 # Update meters
                 self.up_meter.set_pwm(up_pwm)
