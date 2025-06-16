@@ -9,7 +9,7 @@ interface_index = 3
 arduino_ip = '204.128.136.20'
 interval = 2  # seconds between samples
 
-# Scale thresholds
+# Scale thresholds (in bytes per second)
 UPLINK_MAX_BPS = 1_000_000_000     # 1 Gbps
 DOWNLINK_MAX_BPS = 1_000_000_000  # 1 Gbps
 
@@ -49,7 +49,7 @@ def get_snmp_octets(router_ip, community, interface_index):
 def scale_to_pwm(value_bps, max_bps):
     if value_bps < 0 or value_bps > (max_bps * 1.2):
         return 0
-    return int(min(value_bps / max_bps, 1.0) * 255)
+    return int(min(value_bps / max_bps, 1.0) * 100)
 
 def send_pwm_value(arduino_ip, pin, value):
     url = f"http://{arduino_ip}/D{pin}/{value}"
@@ -72,8 +72,8 @@ def monitor_and_update():
     uplink_bps = ((out2 - out1) * 8) / interval if out2 >= out1 else 0
     downlink_bps = ((in2 - in1) * 8) / interval if in2 >= in1 else 0
 
-    # Exponential smoothing
-    alpha = 0.2
+    # Exponential smoothing with alpha=0.6 (same as gauge.py)
+    alpha = 0.6
     smoothed_uplink = (1 - alpha) * smoothed_uplink + alpha * uplink_bps
     smoothed_downlink = (1 - alpha) * smoothed_downlink + alpha * downlink_bps
 

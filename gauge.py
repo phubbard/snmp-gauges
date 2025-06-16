@@ -29,7 +29,7 @@ class NetworkMonitor:
             'ifOutOctets': '1.3.6.1.2.1.31.1.1.1.10.3'  # ifHCOutOctets for eth0 (index 3)
         }
 
-        # Maximum values for scaling (in bytes)
+        # Maximum values for scaling (in bytes per second)
         self.up_max = 125_000_000    # 1 Gbps uplink in bytes/sec
         self.down_max = 125_000_000  # 1 Gbps downlink in bytes/sec
 
