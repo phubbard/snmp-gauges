@@ -30,8 +30,8 @@ class NetworkMonitor:
         }
 
         # Maximum values for scaling (in bytes)
-        self.up_max = 5000000    # 40Mbit uplink in bytes/sec
-        self.down_max = 250000000  # 2Gbit downlink in bytes/sec
+        self.up_max = 125_000_000    # 1 Gbps uplink in bytes/sec
+        self.down_max = 125_000_000  # 1 Gbps downlink in bytes/sec
 
         # Initialize meters
         self.up_meter = NetworkMeter(18, self.up_max, self.oids['ifOutOctets'])  # GPIO18 for upload

@@ -10,7 +10,7 @@ arduino_ip = '204.128.136.20'
 interval = 2  # seconds between samples
 
 # Scale thresholds
-UPLINK_MAX_BPS = 40_000_000     # 40 Mbps
+UPLINK_MAX_BPS = 1_000_000_000     # 1 Gbps
 DOWNLINK_MAX_BPS = 1_000_000_000  # 1 Gbps
 
 # Track smoothed values
