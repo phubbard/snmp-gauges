@@ -2,6 +2,7 @@ import RPi.GPIO as GPIO
 import time
 from pysnmp.hlapi import *
 import math
+import sys
 
 class NetworkMeter:
     def __init__(self, pin, max_value, oid):
@@ -19,7 +20,7 @@ class NetworkMeter:
         self.pwm.stop()
 
 class NetworkMonitor:
-    def __init__(self):
+    def __init__(self, verbose=False):
         # Initialize GPIO
         GPIO.setmode(GPIO.BCM)
         GPIO.setwarnings(False)
@@ -47,6 +48,9 @@ class NetworkMonitor:
         self.smoothed_up_rate = 0
         self.smoothed_down_rate = 0
 
+        # Verbose mode flag
+        self.verbose = verbose
+
     def get_snmp_value(self, oid):
         """Get SNMP value from remote device"""
         errorIndication, errorStatus, errorIndex, varBinds = next(
@@ -66,7 +70,8 @@ class NetworkMonitor:
         else:
             for varBind in varBinds:
                 value = int(varBind[1])
-                print(f"SNMP OID {oid} returned value: {value}")
+                if self.verbose:
+                    print(f"SNMP OID {oid} returned value: {value}")
                 return value
 
     def scale_to_pwm(self, value_bps, max_bps):
@@ -99,7 +104,8 @@ class NetworkMonitor:
                 up_value = self.get_snmp_value(self.oids['ifOutOctets'])  # Value is in bytes
                 down_value = self.get_snmp_value(self.oids['ifInOctets'])  # Value is in bytes
 
-                print(f"Raw SNMP values - Up: {up_value}, Down: {down_value}")
+                if self.verbose:
+                    print(f"Raw SNMP values - Up: {up_value}, Down: {down_value}")
 
                 # Skip the first reading
                 if self.prev_up_value is None or self.prev_down_value is None:
@@ -119,7 +125,8 @@ class NetworkMonitor:
                 else:
                     down_rate = down_value - self.prev_down_value
 
-                print(f"Calculated rates - Up: {up_rate}, Down: {down_rate}")
+                if self.verbose:
+                    print(f"Calculated rates - Up: {up_rate}, Down: {down_rate}")
 
                 # Update previous values
                 self.prev_up_value = up_value
@@ -129,26 +136,34 @@ class NetworkMonitor:
                 self.smoothed_up_rate = (1 - self.alpha) * self.smoothed_up_rate + self.alpha * up_rate
                 self.smoothed_down_rate = (1 - self.alpha) * self.smoothed_down_rate + self.alpha * down_rate
 
-                print(f"Smoothed rates - Up: {self.smoothed_up_rate}, Down: {self.smoothed_down_rate}")
+                if self.verbose:
+                    print(f"Smoothed rates - Up: {self.smoothed_up_rate}, Down: {self.smoothed_down_rate}")
 
                 # Convert to MB/sec for display
                 up_rate_mb = self.smoothed_up_rate / 1000000
                 down_rate_mb = self.smoothed_down_rate / 1000000
 
-                print(f"Rates in MB/s - Up: {up_rate_mb}, Down: {down_rate_mb}")
+                if self.verbose:
+                    print(f"Rates in MB/s - Up: {up_rate_mb}, Down: {down_rate_mb}")
 
                 # Calculate PWM values (0-100)
                 up_pwm = self.scale_to_pwm(self.smoothed_up_rate, self.up_max)
                 down_pwm = self.scale_to_pwm(self.smoothed_down_rate, self.down_max)
 
-                print(f"PWM values - Up: {up_pwm}, Down: {down_pwm}")
+                if self.verbose:
+                    print(f"PWM values - Up: {up_pwm}, Down: {down_pwm}")
 
                 # Update meters
                 self.up_meter.set_pwm(up_pwm)
                 self.down_meter.set_pwm(down_pwm)
 
-                # Sleep for 1 second
-                time.sleep(1)
+                # Print summary every minute in non-verbose mode
+                if not self.verbose:
+                    print(f"Rates in MB/s - Up: {up_rate_mb:.2f}, Down: {down_rate_mb:.2f}")
+                    time.sleep(60)  # Wait for 1 minute
+                else:
+                    # Sleep for 1 second in verbose mode
+                    time.sleep(1)
 
             except Exception as e:
                 print(f"Error in main loop: {e}")
@@ -161,8 +176,9 @@ class NetworkMonitor:
         GPIO.cleanup()
 
 if __name__ == '__main__':
+    verbose = '-v' in sys.argv
     try:
-        monitor = NetworkMonitor()
+        monitor = NetworkMonitor(verbose=verbose)
         monitor.run()
     except KeyboardInterrupt:
         print("\nShutting down...")
