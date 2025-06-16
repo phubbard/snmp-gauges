@@ -64,7 +64,9 @@ class NetworkMonitor:
             return 0
         else:
             for varBind in varBinds:
-                return int(varBind[1])
+                value = int(varBind[1])
+                print(f"SNMP OID {oid} returned value: {value}")
+                return value
 
     def scale_to_pwm(self, value_bps, max_bps):
         """Scale bytes per second to PWM value (0-100)"""
