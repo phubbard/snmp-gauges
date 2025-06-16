@@ -31,7 +31,7 @@ class NetworkMonitor:
         }
 
         # Maximum values for scaling (in bytes per second)
-        self.up_max = 5_000_000    # 40 Mbps uplink in bytes/sec
+        self.up_max = 40_000_000    # 40 MB/s uplink in bytes/sec
         self.down_max = 125_000_000  # 1 Gbps downlink in bytes/sec
 
         # Initialize meters
