@@ -43,7 +43,7 @@ class NetworkMonitor:
         self.prev_down_value = None
 
         # Exponential smoothing parameters
-        self.alpha = 0.6  # Smoothing factor (increased for faster response)
+        self.alpha = 0.8  # Increased smoothing factor for faster response
         self.smoothed_up_rate = 0
         self.smoothed_down_rate = 0
 
@@ -75,13 +75,19 @@ class NetworkMonitor:
             print(f"Warning: Value {value_bps} is negative")
             return 0
 
+        # Set minimum threshold for PWM
+        min_threshold = max_bps * 0.01  # 1% of max
+
         # For very large values, use a logarithmic scale
-        if value_bps > max_bps * 2:
-            log_value = math.log(value_bps / (max_bps * 2), 10)
+        if value_bps > max_bps:
+            log_value = math.log(value_bps / max_bps, 10)
             pwm_value = min(100 - int((math.exp(log_value) - 1) * 50), 100)
-        else:
-            # For normal values, use linear scaling
+        elif value_bps > min_threshold:
+            # For values above threshold but below max, use linear scaling
             pwm_value = int(min(value_bps / max_bps, 1.0) * 100)
+        else:
+            # For values below threshold, set PWM to 0
+            pwm_value = 0
 
         return pwm_value
 
@@ -119,7 +125,7 @@ class NetworkMonitor:
                 self.prev_up_value = up_value
                 self.prev_down_value = down_value
 
-                # Apply exponential smoothing
+                # Apply exponential smoothing with increased alpha
                 self.smoothed_up_rate = (1 - self.alpha) * self.smoothed_up_rate + self.alpha * up_rate
                 self.smoothed_down_rate = (1 - self.alpha) * self.smoothed_down_rate + self.alpha * down_rate
 
