@@ -2,7 +2,11 @@ import RPi.GPIO as GPIO
 import time
 from pysnmp.hlapi import *
 import math
+import os
 import sys
+
+# Rates published here for other tools (sysfetch greeting reads this)
+RATE_FILE = '/run/netrate'
 
 class NetworkMeter:
     def __init__(self, pin, max_value, oid):
@@ -78,6 +82,17 @@ class NetworkMonitor:
                 if self.verbose:
                     print(f"SNMP OID {oid} returned value: {value}")
                 return value
+
+    def write_rates(self):
+        """Atomically publish smoothed rates (bytes/sec) plus scale maxima
+        so readers like sysfetch never see a partial write."""
+        try:
+            with open(RATE_FILE + '.tmp', 'w') as f:
+                f.write(f"{int(self.smoothed_down_rate)} {int(self.smoothed_up_rate)} "
+                        f"{self.down_max} {self.up_max} {int(time.time())}\n")
+            os.replace(RATE_FILE + '.tmp', RATE_FILE)
+        except OSError:
+            pass  # never let publishing break the gauges
 
     def scale_to_pwm(self, value_bps, max_bps):
         """Scale bytes/sec to PWM value (0-100) using logarithmic scaling.
@@ -162,6 +177,9 @@ class NetworkMonitor:
                 # Update meters
                 self.up_meter.set_pwm(up_pwm)
                 self.down_meter.set_pwm(down_pwm)
+
+                # Publish rates for sysfetch and friends
+                self.write_rates()
 
                 # Print summary every 30 seconds in non-verbose mode
                 if not self.verbose:
