@@ -1,0 +1,17 @@
+[Unit]
+Description=Network Traffic Gauge Monitor
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/home/pfh/code/gauge
+ExecStart=/usr/bin/python3 /home/pfh/code/gauge/gauge.py
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
