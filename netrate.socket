@@ -1,0 +1,11 @@
+[Unit]
+Description=Serve /run/netrate to LAN clients
+
+[Socket]
+ListenStream=8378
+Accept=yes
+IPAddressAllow=204.128.136.0/24 localhost
+IPAddressDeny=any
+
+[Install]
+WantedBy=sockets.target

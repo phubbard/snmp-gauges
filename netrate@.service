@@ -1,0 +1,9 @@
+[Unit]
+Description=netrate one-shot responder
+
+[Service]
+Type=oneshot
+ExecStart=/bin/cat /run/netrate
+StandardOutput=socket
+StandardError=journal
+DynamicUser=yes
