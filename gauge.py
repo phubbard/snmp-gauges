@@ -27,24 +27,29 @@ class NetworkMonitor:
 
         # SNMP OIDs for network interface statistics
         self.oids = {
-            'ifInOctets': '1.3.6.1.2.1.31.1.1.1.6.3',  # ifHCInOctets for eth0 (index 3)
-            'ifOutOctets': '1.3.6.1.2.1.31.1.1.1.10.3'  # ifHCOutOctets for eth0 (index 3)
+            'ifInOctets': '1.3.6.1.2.1.31.1.1.1.6.9',  # ifHCInOctets for eth4 (index 9)
+            'ifOutOctets': '1.3.6.1.2.1.31.1.1.1.10.9'  # ifHCOutOctets for eth4 (index 9)
         }
 
-        # Maximum values for scaling (in bits per second)
-        self.up_max = 40_000_000    # 40 Mbps uplink in bits/sec
-        self.down_max = 125_000_000  # 1 Gbps downlink in bits/sec
+        # Maximum values for scaling (in bytes per second)
+        self.up_max = 5_000_000      # 40 Mbps uplink = 5 MB/s
+        self.down_max = 150_000_000  # 1.2 Gbps downlink = 150 MB/s
+
+        # Minimum detectable rate (bytes/sec) - below this, gauge reads zero
+        # 1 KB/s is background noise level
+        self.rate_floor = 1000
 
         # Initialize meters
-        self.up_meter = NetworkMeter(18, self.up_max, self.oids['ifOutOctets'])  # GPIO18 for upload
-        self.down_meter = NetworkMeter(13, self.down_max, self.oids['ifInOctets'])  # GPIO13 for download
+        self.up_meter = NetworkMeter(13, self.up_max, self.oids['ifOutOctets'])  # GPIO13 for upload
+        self.down_meter = NetworkMeter(18, self.down_max, self.oids['ifInOctets'])  # GPIO18 for download
 
         # Store previous SNMP values for rate calculation
         self.prev_up_value = None
         self.prev_down_value = None
+        self.prev_time = None
 
         # Exponential smoothing parameters
-        self.alpha = 0.8  # Increased smoothing factor for faster response
+        self.alpha = 1.0  # No smoothing - immediate response
         self.smoothed_up_rate = 0
         self.smoothed_down_rate = 0
 
@@ -75,26 +80,27 @@ class NetworkMonitor:
                 return value
 
     def scale_to_pwm(self, value_bps, max_bps):
-        """Scale bits per second to PWM value (0-100) using logarithmic scaling for high values"""
-        if value_bps < 0:
-            print(f"Warning: Value {value_bps} is negative")
+        """Scale bytes/sec to PWM value (0-100) using logarithmic scaling.
+
+        Log scaling makes low traffic visible on the gauge while still
+        reaching full scale at max ISP speed. The log range spans from
+        rate_floor to max_bps.
+        """
+        if value_bps <= self.rate_floor:
             return 0
 
-        # Set minimum threshold for PWM
-        min_threshold = max_bps * 0.01  # 1% of max
+        if value_bps >= max_bps:
+            return min(int(100 * (3.0 / 3.3)), 100)
 
-        # For very large values, use a logarithmic scale
-        if value_bps > max_bps:
-            log_value = math.log(value_bps / max_bps, 10)
-            pwm_value = min(100 - int((math.exp(log_value) - 1) * 50), 100)
-        elif value_bps > min_threshold:
-            # For values above threshold but below max, use linear scaling
-            pwm_value = int(min(value_bps / max_bps, 1.0) * 100)
-        else:
-            # For values below threshold, set PWM to 0
-            pwm_value = 0
+        # Logarithmic scaling: map log(value) within [log(floor), log(max)] to [0, max_pwm]
+        log_floor = math.log(self.rate_floor)
+        log_max = math.log(max_bps)
+        log_val = math.log(value_bps)
 
-        return pwm_value
+        fraction = (log_val - log_floor) / (log_max - log_floor)
+        pwm_value = int(fraction * 100 * (3.0 / 3.3))
+
+        return max(0, min(pwm_value, 100))
 
     def run(self):
         """Main loop to update meters"""
@@ -108,69 +114,69 @@ class NetworkMonitor:
                 if self.verbose:
                     print(f"Raw SNMP values - Up: {up_value}, Down: {down_value}")
 
+                current_time = time.time()
+
                 # Skip the first reading
                 if self.prev_up_value is None or self.prev_down_value is None:
                     self.prev_up_value = up_value
                     self.prev_down_value = down_value
+                    self.prev_time = current_time
                     time.sleep(1)
                     continue
 
-                # Calculate rate (delta) in bytes per second, handling counter wrapping
+                # Calculate elapsed time
+                elapsed = current_time - self.prev_time
+
+                # Calculate rate in bytes per second, handling counter wrapping
                 if up_value < self.prev_up_value:
-                    up_rate = (up_value + (2**64) - self.prev_up_value) % (2**64)  # Handle 64-bit counter wrap
+                    up_delta = (up_value + (2**64) - self.prev_up_value) % (2**64)
                 else:
-                    up_rate = up_value - self.prev_up_value
+                    up_delta = up_value - self.prev_up_value
 
                 if down_value < self.prev_down_value:
-                    down_rate = (down_value + (2**64) - self.prev_down_value) % (2**64)  # Handle 64-bit counter wrap
+                    down_delta = (down_value + (2**64) - self.prev_down_value) % (2**64)
                 else:
-                    down_rate = down_value - self.prev_down_value
+                    down_delta = down_value - self.prev_down_value
 
-                if self.verbose:
-                    print(f"Calculated rates - Up: {up_rate}, Down: {down_rate}")
+                up_rate = up_delta / elapsed
+                down_rate = down_delta / elapsed
 
                 # Update previous values
                 self.prev_up_value = up_value
                 self.prev_down_value = down_value
+                self.prev_time = current_time
 
-                # Apply exponential smoothing with increased alpha
+                # Apply exponential smoothing
                 self.smoothed_up_rate = (1 - self.alpha) * self.smoothed_up_rate + self.alpha * up_rate
                 self.smoothed_down_rate = (1 - self.alpha) * self.smoothed_down_rate + self.alpha * down_rate
-
-                if self.verbose:
-                    print(f"Smoothed rates - Up: {self.smoothed_up_rate}, Down: {self.smoothed_down_rate}")
-
-                # Convert to Mb/sec for display
-                up_rate_mb = self.smoothed_up_rate / 1000000
-                down_rate_mb = self.smoothed_down_rate / 1000000
-
-                if self.verbose:
-                    print(f"Rates in MB/s - Up: {up_rate_mb}, Down: {down_rate_mb}")
 
                 # Calculate PWM values (0-100)
                 up_pwm = self.scale_to_pwm(self.smoothed_up_rate, self.up_max)
                 down_pwm = self.scale_to_pwm(self.smoothed_down_rate, self.down_max)
 
                 if self.verbose:
-                    print(f"PWM values - Up: {up_pwm}, Down: {down_pwm}")
+                    up_rate_mb = self.smoothed_up_rate / 1_000_000
+                    down_rate_mb = self.smoothed_down_rate / 1_000_000
+                    print(f"Up: {up_rate_mb:.3f} MB/s (PWM {up_pwm}%), Down: {down_rate_mb:.3f} MB/s (PWM {down_pwm}%)")
 
                 # Update meters
                 self.up_meter.set_pwm(up_pwm)
                 self.down_meter.set_pwm(down_pwm)
 
-                # Print summary every minute in non-verbose mode
+                # Print summary every 30 seconds in non-verbose mode
                 if not self.verbose:
-                    current_time = time.time()
-                    if current_time - last_print_time >= 60:
-                        print(f"Rates in MB/s - Up: {up_rate_mb:.2f}, Down: {down_rate_mb:.2f}")
+                    if current_time - last_print_time >= 30:
+                        up_rate_mb = self.smoothed_up_rate / 1_000_000
+                        down_rate_mb = self.smoothed_down_rate / 1_000_000
+                        print(f"Up: {up_rate_mb:.3f} MB/s (PWM {up_pwm}%), Down: {down_rate_mb:.3f} MB/s (PWM {down_pwm}%)")
                         last_print_time = current_time
 
-                # Sleep for 1 second
+                # 1-second update interval
                 time.sleep(1)
 
             except Exception as e:
                 print(f"Error in main loop: {e}")
-                time.sleep(1)  # Still sleep on error to prevent tight loop
+                time.sleep(1)
 
     def cleanup(self):
         """Clean up GPIO resources"""
