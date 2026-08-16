@@ -159,6 +159,13 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now netrate.socket
 ```
 
+## Legacy Implementations
+
+Earlier generations of this project, kept for reference: `monitor.py`,
+`mon_two.py`, `mon_three.py` (first Raspberry Pi implementations),
+`RESTduino.ino` (Arduino + RESTduino variant), and build photos
+`front.jpeg` / `top.jpeg`.
+
 ## License
 
 This project is for educational and monitoring purposes. Ensure SNMP access complies with your network policies.

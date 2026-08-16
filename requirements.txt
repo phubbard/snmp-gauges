@@ -1,0 +1,12 @@
+certifi==2025.1.31
+charset-normalizer==3.4.1
+idna==3.10
+jinja2==3.1.6
+markupsafe==3.0.2
+ply==3.11
+pyasn1==0.4.8
+pycryptodomex==3.22.0
+pysmi==1.5.11
+pysnmp==4.4.12
+requests==2.32.3
+urllib3==2.4.0
