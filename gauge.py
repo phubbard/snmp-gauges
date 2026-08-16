@@ -60,13 +60,21 @@ class NetworkMonitor:
         # Verbose mode flag
         self.verbose = verbose
 
+        # SNMP session objects, built once and reused every poll.
+        # SnmpEngine() construction is very expensive (MIB loading etc);
+        # rebuilding it per query burned ~60% of a core.
+        self.snmp_engine = SnmpEngine()
+        self.snmp_community = CommunityData('phfactor.net', mpModel=1)  # SNMPv2c
+        self.snmp_target = UdpTransportTarget(('204.128.136.11', 161))
+        self.snmp_context = ContextData()
+
     def get_snmp_value(self, oid):
         """Get SNMP value from remote device"""
         errorIndication, errorStatus, errorIndex, varBinds = next(
-            getCmd(SnmpEngine(),
-                  CommunityData('phfactor.net', mpModel=1),  # SNMPv2c
-                  UdpTransportTarget(('204.128.136.11', 161)),
-                  ContextData(),
+            getCmd(self.snmp_engine,
+                  self.snmp_community,
+                  self.snmp_target,
+                  self.snmp_context,
                   ObjectType(ObjectIdentity(oid)))
         )
 
